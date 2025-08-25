@@ -1,0 +1,85 @@
+version: "3.9"
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  grafana_data:
+  prometheus_data:
+  loki_data:
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports: ["9090:9090"]
+    networks: [monitoring]
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    user: "65534:65534"
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml","--storage.path=/alertmanager"]
+    ports: ["9093:9093"]
+    networks: [monitoring]
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    user: "472:472"
+    ports: ["3000:3000"]
+    networks: [monitoring]
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=grafana
+      - GF_SECURITY_ADMIN_PASSWORD=changeme
+      - GF_USERS_DEFAULT_THEME=dark
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+
+  loki:
+    image: grafana/loki:2.9.6
+    container_name: loki
+    user: "10001:10001"      # <- use Loki’s own user
+    command: -config.file=/etc/loki/config.yml
+    ports: ["3100:3100"]
+    networks: [monitoring]
+    restart: unless-stopped
+    volumes:
+      - ./loki/config.yml:/etc/loki/config.yml:ro
+      - loki_data:/var/loki
+
+  promtail:
+    image: grafana/promtail:2.9.6
+    container_name: promtail
+    user: "0:0"
+    command: -config.file=/etc/promtail/config.yml
+    networks: [monitoring]
+    restart: unless-stopped
+    volumes:
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+
+  node_exporter:
+    image: prom/node-exporter:v1.8.1
+    container_name: node-exporter
+    pid: host
+    network_mode: host
+    restart: unless-stopped
+    command: ["--path.rootfs=/"]
+

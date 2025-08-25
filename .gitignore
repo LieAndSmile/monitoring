@@ -1,0 +1,14 @@
+# Docker volumes / persistent data
+grafana/data/
+loki/data/
+loki/wal/
+*_data/
+
+# Logs & temp
+*.log
+*.tmp
+
+# System/Editor
+.DS_Store
+*.swp
+
